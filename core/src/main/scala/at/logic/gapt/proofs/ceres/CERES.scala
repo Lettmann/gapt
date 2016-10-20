@@ -6,6 +6,7 @@ import at.logic.gapt.proofs.lk._
 import at.logic.gapt.proofs.resolution._
 import at.logic.gapt.proofs.HOLSequent
 import at.logic.gapt.expr._
+import at.logic.gapt.proofs.expansion.ExpansionProofWithCut
 import at.logic.gapt.provers.ResolutionProver
 import at.logic.gapt.provers.escargot.Escargot
 
@@ -51,8 +52,8 @@ class CERES {
    *          also each formula must be a FOLFormula, since the prover9 interface returns proofs from the FOL layer
    * @return an LK Proof in Atomic Cut Normal Form (ACNF) i.e. without quantified cuts
    */
-  def apply( p: LKProof ): LKProof = apply( p, Escargot )
-  def apply( p: LKProof, prover: ResolutionProver ): LKProof = apply( p, CERES.skipNothing, prover )
+  def apply( p: LKProof ): HOLSequent = apply( p, Escargot )
+  def apply( p: LKProof, prover: ResolutionProver ): HOLSequent = apply( p, CERES.skipNothing, prover )
 
   /**
    * Applies the CERES method to a first order proof with equality. Internally this is handled by the RobinsoToLK method.
@@ -63,8 +64,25 @@ class CERES {
    *             (e.g. x => containsQuantifiers(x) to keep propositional cuts intact)
    * @return an LK Proof in Atomic Cut Normal Form (ACNF) i.e. without quantified cuts
    */
-  def apply( p: LKProof, pred: HOLFormula => Boolean ): LKProof = apply( p, pred, Escargot )
+  /*def apply( p: LKProof, pred: HOLFormula => Boolean ): LKProof = apply( p, pred, Escargot )
   def apply( p: LKProof, pred: HOLFormula => Boolean, prover: ResolutionProver ): LKProof = groundFreeVarsLK.wrap( p ) { p =>
+    val es = p.endSequent
+    val p_ = regularize( AtomicExpansion( p ) )
+    val cs = CharacteristicClauseSet( StructCreators.extract( p_, pred ) )
+    val proj = Projections( p_, pred )
+    val tapecl = subsumedClausesRemoval( deleteTautologies( cs ).toList )
+
+    prover.getResolutionProof( tapecl ) match {
+      case None => throw new Exception(
+        "The characteristic clause set could not be refuted:\n" +
+          TPTPFOLExporter( tapecl )
+      )
+      case Some( rp ) =>
+        apply( es, proj, eliminateSplitting( rp ) )
+    }
+  }*/
+  def apply( p: LKProof, pred: HOLFormula => Boolean ): HOLSequent = apply( p, pred, Escargot )
+  def apply( p: LKProof, pred: HOLFormula => Boolean, prover: ResolutionProver ): HOLSequent = {
     val es = p.endSequent
     val p_ = regularize( AtomicExpansion( p ) )
     val cs = CharacteristicClauseSet( StructCreators.extract( p_, pred ) )
@@ -90,10 +108,11 @@ class CERES {
    * @return an LK Proof in Atomic Cut Normal Form (ACNF) i.e. without quantified cuts
    */
   def apply( endsequent: HOLSequent, projections: Set[LKProof], rp: ResolutionProof ) = {
-    WeakeningContractionMacroRule(
-      ResolutionToLKProof( rp, findMatchingProjection( endsequent, projections ) ),
+    /*WeakeningContractionMacroRule(
+      ResolutionToLKProof( rp /*, findMatchingProjection( endsequent, projections ) */ ),
       endsequent
-    )
+    )*/
+    ResolutionToDeepFunctionFromProj( rp, findMatchingProjection( endsequent, projections ) )
   }
 
   /**
@@ -105,12 +124,13 @@ class CERES {
    * @note This method is passed to ResolutionToLKProof, which handles the simulation of the reflexivity introduction
    *       rule by itself.
    */
-  def findMatchingProjection( endsequent: HOLSequent, projections: Set[LKProof] )( input_clause: Input ): LKProof = {
+  def findMatchingProjection( endsequent: HOLSequent, projections: Set[LKProof] )( input_clause: Input ): HOLSequent = {
     val axfs = input_clause.conclusion
     for {
       proj <- projections
       sub <- clauseSubsumption( proj.endSequent diff endsequent, axfs )
-    } return WeakeningContractionMacroRule( sub( proj ), endsequent ++ axfs )
+    } //return WeakeningContractionMacroRule( sub( proj ), endsequent ++ axfs )
+    return ( LKToExpansionProof( WeakeningContractionMacroRule( sub( proj ), endsequent ++ axfs ) ).deep ).diff( axfs )
 
     throw new Exception( "Could not find a projection to " + axfs + " in " +
       projections.map( _.endSequent.diff( endsequent ) ).mkString( "{\n", ";\n", "\n}" ) )

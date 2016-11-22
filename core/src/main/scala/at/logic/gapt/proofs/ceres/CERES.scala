@@ -2,10 +2,12 @@ package at.logic.gapt.proofs.ceres
 
 import at.logic.gapt.formats.llk.LLKExporter
 import at.logic.gapt.formats.tptp.TPTPFOLExporter
-import at.logic.gapt.proofs.lk._
+import at.logic.gapt.proofs.lk.{ LKToExpansionProof, _ }
 import at.logic.gapt.proofs.resolution._
 import at.logic.gapt.proofs.HOLSequent
+import at.logic.gapt.proofs.Sequent
 import at.logic.gapt.expr._
+import at.logic.gapt.proofs.expansion.{ ExpansionProof, ExpansionProofWithCut, ExpansionSequent, ExpansionTree }
 import at.logic.gapt.provers.ResolutionProver
 import at.logic.gapt.provers.escargot.Escargot
 
@@ -111,9 +113,55 @@ class CERES {
       proj <- projections
       sub <- clauseSubsumption( proj.endSequent diff endsequent, axfs )
     } return WeakeningContractionMacroRule( sub( proj ), endsequent ++ axfs )
-
     throw new Exception( "Could not find a projection to " + axfs + " in " +
       projections.map( _.endSequent.diff( endsequent ) ).mkString( "{\n", ";\n", "\n}" ) )
+  }
+
+  /**
+   * Computes the expansion proof of the CERES-normal form using projections and the resolution refutation.
+   *
+   * @param endsequent The end-sequent of the original proof
+   * @param projections The projections of the original proof
+   * @param rp A resolution refutation
+   * @return an ExpansionProof
+   */
+  def getExpansionProofFromProjections( endsequent: HOLSequent, projections: Set[LKProof], rp: ResolutionProof ): ExpansionProofWithCut = {
+    return CERESResolutionToExpansionProof( rp, findPartialExpansionSequent( endsequent, projections ) )
+  }
+
+  /**
+   * Computes the Herbrand Sequent of the CERES-normal form using projections and the resolution refutation.
+   *
+   * @param endsequent The end-sequent of the original proof
+   * @param projections The projections of the original proof
+   * @param rp A resolution refutation
+   * @return a Sequent of HOL Formulas
+   */
+  def getHerbrandSequentFromProjections( endsequent: HOLSequent, projections: Set[LKProof], rp: ResolutionProof ): Sequent[HOLFormula] = {
+    return getExpansionProofFromProjections( endsequent, projections, rp ).deep
+  }
+
+  /**
+   * Computes the partial expansion sequent of the matching projection of an input clause in the set of projections.
+   * @param endsequent The common end-sequent of all projections.
+   * @param projections The set of projections.
+   * @param input_clause The clause we need to project to.
+   * @return An expansion sequent of the projection corresponding to the input clause, without the clause part (we compute
+   *         the expansion trees of all formulas in the end-sequent of the projection except of the formulas corresponding
+   *         to the input clause).
+   */
+  def findPartialExpansionSequent( endsequent: HOLSequent, projections: Set[LKProof] )( input_clause: Input ): ExpansionSequent = {
+    var expansionSequent = LKToExpansionProof( findMatchingProjection( endsequent, projections )( input_clause ) ).expansionSequent
+    var succedent = expansionSequent.antecedent
+    var antecedent = expansionSequent.succedent
+
+    for ( c <- input_clause.sequent.antecedent ) {
+      succedent = succedent filter { _.shallow != c }
+    }
+    for ( c <- input_clause.sequent.succedent ) {
+      antecedent = antecedent filter { _.shallow != c }
+    }
+    return ExpansionSequent( succedent, antecedent )
   }
 
 }

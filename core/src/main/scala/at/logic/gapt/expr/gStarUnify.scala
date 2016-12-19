@@ -6,7 +6,9 @@ package at.logic.gapt.expr
 
 /*
 Some test code:
+
 import at.logic.gapt.expr.gStarUnify
+
 val x = fov"x"
 val y = fov"y"
 val c = foc"c"
@@ -21,6 +23,48 @@ val NP2 = fof"-$P2"
 val setOfLiterals:Set[FOLFormula]=Set(P1,NP2,P3)
 val productionRulesX:Set[(LambdaExpression,LambdaExpression)]=Set((fc,a))
 val productionRulesY:Set[(LambdaExpression,LambdaExpression)]=Set()
+val nameOfExistentialVariable:LambdaExpression = y
+val nameOfUniversalVariable:LambdaExpression = x
+gStarUnify(setOfLiterals,productionRulesX,productionRulesY,nameOfExistentialVariable,nameOfUniversalVariable)
+
+
+val x = fov"x"
+val y = fov"y"
+val c = foc"c"
+val a = foc"a"
+val fc = fot"f($c)"
+val ffc = fot"f($fc)"
+val fa = fot"f($a)"
+val P1 = foa"P($fc,$c,$ffc)"
+val P2 = foa"P($a,$c,$fa)"
+val P3 = foa"Q($a,$c)"
+val P4 = foa"Q($a,$c,$fc)"
+val NP2 = fof"-$P2"
+val NP4 = fof"-$P4"
+val setOfLiterals:Set[FOLFormula]=Set(P1,NP2,P3,NP4)
+val productionRulesX:Set[(LambdaExpression,LambdaExpression)]=Set((fc,a))
+val productionRulesY:Set[(LambdaExpression,LambdaExpression)]=Set((c,c))
+val nameOfExistentialVariable:LambdaExpression = y
+val nameOfUniversalVariable:LambdaExpression = x
+gStarUnify(setOfLiterals,productionRulesX,productionRulesY,nameOfExistentialVariable,nameOfUniversalVariable)
+
+
+val x = fov"x"
+val y = fov"y"
+val c = foc"c"
+val a = foc"a"
+val fc = fot"f($c)"
+val ffc = fot"f($fc)"
+val fa = fot"f($a)"
+val P1 = foa"P($fc,$c,$ffc)"
+val P2 = foa"P($a,$c,$fa)"
+val P3 = foa"Q($a,$c)"
+val P4 = foa"Q($a,$c)"
+val NP2 = fof"-$P2"
+val NP4 = fof"-$P4"
+val setOfLiterals:Set[FOLFormula]=Set(P1,NP2,P3,NP4)
+val productionRulesX:Set[(LambdaExpression,LambdaExpression)]=Set((fc,a))
+val productionRulesY:Set[(LambdaExpression,LambdaExpression)]=Set((c,c))
 val nameOfExistentialVariable:LambdaExpression = y
 val nameOfUniversalVariable:LambdaExpression = x
 gStarUnify(setOfLiterals,productionRulesX,productionRulesY,nameOfExistentialVariable,nameOfUniversalVariable)
@@ -122,69 +166,26 @@ object gStarUnify {
 
     var unifiedTerms: Option[Seq[LambdaExpression]] = None
     var stopIt: Boolean = false
+    var stopItAll: Boolean = false
     var iterator: Int = 0
 
     zippedArgs.foreach( t => {
       stopIt = false
+      stopItAll = false
+
+      val ( tL, tR ) = t
+
       productionRulesX.foreach( productionRuleX => while ( !stopIt ) {
 
-        t match {
-          case pair if ( productionRuleX == pair ) => {
-            unifiedTerms = unifiedTerms match {
-              case Some( update ) => Option( update ++: Seq( nameOfUniversalVariable ) )
-              case None           => Option( Seq( nameOfUniversalVariable ) )
-            }
-            iterator = productionRulesX.size
+        val ( productionRuleXL, productionRuleXR ) = productionRuleX
+
+        if ( productionRuleXL.syntaxEquals( tL ) && productionRuleXR.syntaxEquals( tR ) ) {
+          unifiedTerms = unifiedTerms match {
+            case Some( update ) => Option( update ++: Seq( nameOfUniversalVariable ) )
+            case None           => Option( Seq( nameOfUniversalVariable ) )
           }
-          case _ => {
-            productionRulesY.foreach( productionRuleY => while ( !stopIt ) {
-
-              t match {
-                case pair if ( productionRuleY == pair ) => {
-                  unifiedTerms = unifiedTerms match {
-                    case Some( update ) => Option( update ++: Seq( nameOfExistentialVariable ) )
-                    case None           => Option( Seq( nameOfExistentialVariable ) )
-                  }
-                  iterator = productionRulesY.size
-                }
-                case _ => {
-
-                  val ( argL, argR ) = t
-                  if ( argL == argR ) {
-                    unifiedTerms = unifiedTerms match {
-                      case Some( update ) => Option( update ++: Seq( argL ) )
-                      case None           => Option( Seq( argL ) )
-                    }
-                  } else {
-                    val Apps( nameOfArgL, argsOfArgL ) = argL
-                    val Apps( nameOfArgR, argsOfArgR ) = argR
-
-                    if ( ( nameOfArgL == nameOfArgR ) && ( argsOfArgL.length == argsOfArgR.length ) ) {
-                      unify( argsOfArgL.zip( argsOfArgR ), productionRulesX, productionRulesY, nameOfExistentialVariable, nameOfUniversalVariable ) match {
-                        case Some( r ) => unifiedTerms = unifiedTerms match {
-                          case Some( update ) => Option( update ++: Seq( Apps( nameOfArgL, r ) ) )
-                          case None           => Option( Seq( Apps( nameOfArgL, r ) ) )
-                        }
-                        case _ => stopIt = true
-                      }
-                    } else {
-                      stopIt = true
-                      unifiedTerms = None
-                    }
-                  }
-
-                }
-              }
-
-              if ( iterator == productionRulesY.size ) {
-                iterator = 0
-                stopIt = true
-              } else {
-                iterator += 1
-              }
-
-            } )
-          }
+          stopIt = true
+          stopItAll = true
         }
 
         if ( iterator == productionRulesX.size ) {
@@ -193,8 +194,56 @@ object gStarUnify {
         } else {
           iterator += 1
         }
-
       } )
+
+      stopIt = false
+
+      productionRulesY.foreach( productionRuleY => while ( ( !stopIt ) && ( !stopItAll ) ) {
+
+        val ( productionRuleYL, productionRuleYR ) = productionRuleY
+
+        if ( productionRuleYL.syntaxEquals( tL ) && productionRuleYR.syntaxEquals( tR ) ) {
+          unifiedTerms = unifiedTerms match {
+            case Some( update ) => Option( update ++: Seq( nameOfExistentialVariable ) )
+            case None           => Option( Seq( nameOfExistentialVariable ) )
+          }
+          stopIt = true
+          stopItAll = true
+        }
+
+        if ( iterator == productionRulesY.size ) {
+          iterator = 0
+          stopIt = true
+        } else {
+          iterator += 1
+        }
+      } )
+
+      if ( !stopItAll ) {
+
+        val Apps( nameOfArgL, argsOfArgL ) = tL
+        val Apps( nameOfArgR, argsOfArgR ) = tR
+
+        if ( tL.syntaxEquals( tR ) ) {
+
+          unifiedTerms = unifiedTerms match {
+            case Some( update ) => Option( update ++: Seq( tL ) )
+            case None           => Option( Seq( tR ) )
+          }
+
+        } else if ( ( nameOfArgL == nameOfArgR ) && ( argsOfArgL.length == argsOfArgR.length ) ) {
+
+          unify( argsOfArgL.zip( argsOfArgR ), productionRulesX, productionRulesY, nameOfExistentialVariable, nameOfUniversalVariable ) match {
+            case Some( r ) => unifiedTerms = unifiedTerms match {
+              case Some( update ) => Option( update ++: Seq( Apps( nameOfArgL, r ) ) )
+              case None           => Option( Seq( Apps( nameOfArgL, r ) ) )
+            }
+            case _ =>
+          }
+
+        }
+      }
+
     } )
 
     unifiedTerms

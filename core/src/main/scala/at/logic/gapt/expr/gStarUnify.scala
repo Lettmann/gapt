@@ -9,8 +9,8 @@ Some test code:
 
 import at.logic.gapt.expr.gStarUnify
 
-val x = fov"x"
-val y = fov"y"
+val nameOfUniversalVariable = fov"x"
+val nameOfExistentialVariable = fov"y"
 val c = foc"c"
 val a = foc"a"
 val fc = fot"f($c)"
@@ -23,13 +23,11 @@ val NP2 = fof"-$P2"
 val setOfLiterals:Set[FOLFormula]=Set(P1,NP2,P3)
 val productionRulesX:Set[(LambdaExpression,LambdaExpression)]=Set((fc,a))
 val productionRulesY:Set[(LambdaExpression,LambdaExpression)]=Set()
-val nameOfExistentialVariable:LambdaExpression = y
-val nameOfUniversalVariable:LambdaExpression = x
 gStarUnify(setOfLiterals,productionRulesX,productionRulesY,nameOfExistentialVariable,nameOfUniversalVariable)
 
 
-val x = fov"x"
-val y = fov"y"
+val nameOfUniversalVariable = fov"x"
+val nameOfExistentialVariable = fov"y"
 val c = foc"c"
 val a = foc"a"
 val fc = fot"f($c)"
@@ -44,13 +42,11 @@ val NP4 = fof"-$P4"
 val setOfLiterals:Set[FOLFormula]=Set(P1,NP2,P3,NP4)
 val productionRulesX:Set[(LambdaExpression,LambdaExpression)]=Set((fc,a))
 val productionRulesY:Set[(LambdaExpression,LambdaExpression)]=Set((c,c))
-val nameOfExistentialVariable:LambdaExpression = y
-val nameOfUniversalVariable:LambdaExpression = x
 gStarUnify(setOfLiterals,productionRulesX,productionRulesY,nameOfExistentialVariable,nameOfUniversalVariable)
 
 
-val x = fov"x"
-val y = fov"y"
+val nameOfUniversalVariable = fov"x"
+val nameOfExistentialVariable = fov"y"
 val c = foc"c"
 val a = foc"a"
 val fc = fot"f($c)"
@@ -65,8 +61,6 @@ val NP4 = fof"-$P4"
 val setOfLiterals:Set[FOLFormula]=Set(P1,NP2,P3,NP4)
 val productionRulesX:Set[(LambdaExpression,LambdaExpression)]=Set((fc,a))
 val productionRulesY:Set[(LambdaExpression,LambdaExpression)]=Set((c,c))
-val nameOfExistentialVariable:LambdaExpression = y
-val nameOfUniversalVariable:LambdaExpression = x
 gStarUnify(setOfLiterals,productionRulesX,productionRulesY,nameOfExistentialVariable,nameOfUniversalVariable)
  */
 
@@ -76,9 +70,9 @@ object gStarUnify {
     setOfLiterals:             Set[FOLFormula],
     productionRulesX:          Set[( LambdaExpression, LambdaExpression )],
     productionRulesY:          Set[( LambdaExpression, LambdaExpression )],
-    nameOfExistentialVariable: LambdaExpression,
-    nameOfUniversalVariable:   LambdaExpression
-  ): Set[LambdaExpression] = {
+    nameOfExistentialVariable: FOLVar,
+    nameOfUniversalVariable:   FOLVar
+  ): Set[FOLFormula] = {
 
     val productionRulesXS: scala.collection.mutable.Set[( LambdaExpression, LambdaExpression )] = scala.collection.mutable.Set[( LambdaExpression, LambdaExpression )]()
     productionRulesX.foreach( element => {
@@ -97,13 +91,19 @@ object gStarUnify {
     val literals = sortAndAtomize( setOfLiterals )
     val ( posAtoms, negAtoms ) = literals
 
-    val unifiedLiterals = scala.collection.mutable.Set[LambdaExpression]()
+    val unifiedLiterals = scala.collection.mutable.Set[FOLFormula]()
 
     posAtoms.foreach( posAt =>
       negAtoms.foreach( negAt =>
         unifyLiterals( posAt, negAt, productionRulesXS.toSet, productionRulesYS.toSet, nameOfExistentialVariable, nameOfUniversalVariable ) match {
-          case Some( t ) => unifiedLiterals += t
-          case None      =>
+          /*
+          The next line is a compromise since we do not consider negation during the unification procedure (Future work). This way we add some unnecessary literals.
+           */
+          case Some( t ) => {
+            unifiedLiterals += t
+            unifiedLiterals += Neg( t )
+          }
+          case None =>
         } ) )
 
     unifiedLiterals.toSet
@@ -133,19 +133,25 @@ object gStarUnify {
     negAt:                     FOLFormula,
     productionRulesX:          Set[( LambdaExpression, LambdaExpression )],
     productionRulesY:          Set[( LambdaExpression, LambdaExpression )],
-    nameOfExistentialVariable: LambdaExpression,
-    nameOfUniversalVariable:   LambdaExpression
-  ): Option[LambdaExpression] = {
+    nameOfExistentialVariable: FOLVar,
+    nameOfUniversalVariable:   FOLVar
+  ): Option[FOLFormula] = {
 
-    val Apps( nameOfPos, argsP ) = posAt
-    val Apps( nameOfNeg, argsN ) = negAt
+    val Apps( nameOfPos, argsP ): FOLFormula = posAt
+    val Apps( nameOfNeg, argsN ): FOLFormula = negAt
 
-    val unifiedLiteral: Option[LambdaExpression] = nameOfPos match {
+    val unifiedLiteral: Option[FOLFormula] = nameOfPos match {
       case t if ( ( nameOfNeg == t ) && ( argsP.length == argsN.length ) ) => {
         val unifiedArgs = unify( argsP.zip( argsN ), productionRulesX, productionRulesY, nameOfExistentialVariable, nameOfUniversalVariable )
         val theUnifiedLiteral = unifiedArgs match {
-          case Some( t ) => Some( Apps( nameOfPos, t ) )
-          case _         => None
+          case Some( s ) => {
+            if ( s.length == argsP.length ) {
+              Some( Apps( nameOfPos, s ).asInstanceOf[FOLFormula] )
+            } else {
+              None
+            }
+          }
+          case _ => None
         }
         theUnifiedLiteral
       }
@@ -160,11 +166,11 @@ object gStarUnify {
     zippedArgs:                List[( LambdaExpression, LambdaExpression )],
     productionRulesX:          Set[( LambdaExpression, LambdaExpression )],
     productionRulesY:          Set[( LambdaExpression, LambdaExpression )],
-    nameOfExistentialVariable: LambdaExpression,
-    nameOfUniversalVariable:   LambdaExpression
-  ): Option[Seq[LambdaExpression]] = {
+    nameOfExistentialVariable: FOLVar,
+    nameOfUniversalVariable:   FOLVar
+  ): Option[Seq[FOLTerm]] = {
 
-    var unifiedTerms: Option[Seq[LambdaExpression]] = None
+    var unifiedTerms: Option[Seq[FOLTerm]] = None
     var stopIt: Boolean = false
     var stopItAll: Boolean = false
     var iterator: Int = 0
@@ -227,16 +233,16 @@ object gStarUnify {
         if ( tL.syntaxEquals( tR ) ) {
 
           unifiedTerms = unifiedTerms match {
-            case Some( update ) => Option( update ++: Seq( tL ) )
-            case None           => Option( Seq( tR ) )
+            case Some( update ) => Option( update ++: Seq( tL.asInstanceOf[FOLTerm] ) )
+            case None           => Option( Seq( tR.asInstanceOf[FOLTerm] ) )
           }
 
         } else if ( ( nameOfArgL == nameOfArgR ) && ( argsOfArgL.length == argsOfArgR.length ) ) {
 
           unify( argsOfArgL.zip( argsOfArgR ), productionRulesX, productionRulesY, nameOfExistentialVariable, nameOfUniversalVariable ) match {
             case Some( r ) => unifiedTerms = unifiedTerms match {
-              case Some( update ) => Option( update ++: Seq( Apps( nameOfArgL, r ) ) )
-              case None           => Option( Seq( Apps( nameOfArgL, r ) ) )
+              case Some( update ) => Option( update ++: Seq( Apps( nameOfArgL, r ).asInstanceOf[FOLTerm] ) )
+              case None           => Option( Seq( Apps( nameOfArgL, r ).asInstanceOf[FOLTerm] ) )
             }
             case _ =>
           }

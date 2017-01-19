@@ -91,6 +91,13 @@ object gStarUnify {
     val literals = sortAndAtomize( setOfLiterals )
     val ( posAtoms, negAtoms ) = literals
 
+    // println( "literals" )
+    // println( literals )
+    // println( "posAtoms" )
+    // println( posAtoms )
+    // println( "negAtoms" )
+    // println( negAtoms )
+
     val unifiedLiterals = scala.collection.mutable.Set[FOLFormula]()
 
     posAtoms.foreach( posAt =>
@@ -143,6 +150,18 @@ object gStarUnify {
     val unifiedLiteral: Option[FOLFormula] = nameOfPos match {
       case t if ( ( nameOfNeg == t ) && ( argsP.length == argsN.length ) ) => {
         val unifiedArgs = unify( argsP.zip( argsN ), productionRulesX, productionRulesY, nameOfExistentialVariable, nameOfUniversalVariable )
+
+        // println( "unifiedArgs" )
+        // println( unifiedArgs )
+        // println( "argsP" )
+        // println( argsP )
+        // println( "argsN" )
+        // println( argsN )
+        // println( "productionRulesX" )
+        // println( productionRulesX )
+        // println( "productionRulesY" )
+        // println( productionRulesY )
+
         val theUnifiedLiteral = unifiedArgs match {
           case Some( s ) => {
             if ( s.length == argsP.length ) {
@@ -157,6 +176,9 @@ object gStarUnify {
       }
       case _ => None
     }
+
+    // println( "unifiedLiteral" )
+    // println( unifiedLiteral )
 
     unifiedLiteral
 
@@ -173,7 +195,7 @@ object gStarUnify {
     var unifiedTerms: Option[Seq[FOLTerm]] = None
     var stopIt: Boolean = false
     var stopItAll: Boolean = false
-    var iterator: Int = 0
+    var iterator: Int = 1
 
     zippedArgs.foreach( t => {
       stopIt = false
@@ -181,7 +203,12 @@ object gStarUnify {
 
       val ( tL, tR ) = t
 
-      productionRulesX.foreach( productionRuleX => while ( !stopIt ) {
+      // println( "t" )
+      // println( t )
+      // println( "productionRulesX.size" )
+      // println( productionRulesX.size )
+
+      productionRulesX.foreach( productionRuleX => if ( !stopIt ) {
 
         val ( productionRuleXL, productionRuleXR ) = productionRuleX
 
@@ -194,8 +221,19 @@ object gStarUnify {
           stopItAll = true
         }
 
+        // println( "comparison" )
+        // println( productionRuleXL.syntaxEquals( tL ) && productionRuleXR.syntaxEquals( tR ) )
+        // println( "XL" )
+        // println( productionRuleXL )
+        // println( "tL" )
+        // println( tL )
+        // println( "XR" )
+        // println( productionRuleXR )
+        // println( "tR" )
+        // println( tR )
+
         if ( iterator == productionRulesX.size ) {
-          iterator = 0
+          iterator = 1
           stopIt = true
         } else {
           iterator += 1
@@ -204,7 +242,7 @@ object gStarUnify {
 
       stopIt = false
 
-      productionRulesY.foreach( productionRuleY => while ( ( !stopIt ) && ( !stopItAll ) ) {
+      productionRulesY.foreach( productionRuleY => if ( ( !stopIt ) && ( !stopItAll ) ) {
 
         val ( productionRuleYL, productionRuleYR ) = productionRuleY
 
@@ -218,7 +256,7 @@ object gStarUnify {
         }
 
         if ( iterator == productionRulesY.size ) {
-          iterator = 0
+          iterator = 1
           stopIt = true
         } else {
           iterator += 1
@@ -249,6 +287,9 @@ object gStarUnify {
 
         }
       }
+
+      // println( "unifiedTerms" )
+      // println( unifiedTerms )
 
     } )
 

@@ -61,10 +61,40 @@ seHs.substitutionsBetaI(1)
 seHs.herbrandSequent
 seHs.reducedRepresentationToFormula
 
+val x = fov"x"
+val y = fov"y"
+val z = fov"z"
+val r1 = fot"r1"
+val r2 = fot"r2($y)"
+val t1 = fot"t1($x)"
+val t2 = fot"t2($x)"
+val ft1 = fot"f($t1)"
+val ft2 = fot"f($t2)"
+val fy = fot"f($y)"
+val fz = fot"f($z)"
+val sx = fot"s($x)"
+val sr1 = fot"s($r1)"
+val sr2 = fot"s($r2)"
+val P1 = fof"P($x,$ft1)"
+val P2 = fof"P($x,$ft2)"
+val P3 = fof"P($r1,$fy)"
+val P4 = fof"P($r2,$fz)"
+val Q1 = fof"Q($sx,$t1)"
+val Q2 = fof"Q($sx,$t2)"
+val Q3 = fof"Q($sr1,$y)"
+val Q4 = fof"Q($sr2,$z)"
+val F = fof"$P1|$Q1|$P2|$Q2"
+val G1 = fof"$P3|$Q3"
+val G2 = fof"$P4|$Q4"
+val G = fof"$G1&$G2"
+val R = F +: Sequent() :+ G
+val seHs = new pi2SeHs(R,x,List(y,z),List(r1,r2),List(t1,t2))
+
+
+import at.logic.gapt.expr.introducePi2Cut
 val xName = fov"xName"
 val yName = fov"yName"
-import at.logic.gapt.expr.introducePi2Cut
-introducePi2Cut(seHs,xName,yName)
+introducePi2Cut(seHs,yName,xName)
  */
 
 class pi2SeHs(
@@ -245,6 +275,15 @@ object introducePi2Cut {
 
     val DNTAList = DNTA.toList
 
+    // println( "DNTAList" )
+    // println( DNTAList )
+    // println( "literals" )
+    // println( literals )
+    // println( "seHs.substitutionPairsAlpha" )
+    // println( seHs.substitutionPairsAlpha() )
+    // println( "seHs.substitutionsPairsBeta" )
+    // println( seHs.substitutionPairsBeta() )
+
     /*
     *** Add to the program ***
     Test whether the names of the variables are already taken.
@@ -258,6 +297,9 @@ object introducePi2Cut {
       nameOfUniversalVariable
     )
 
+    // println( "unifiedLiterals" )
+    // println( unifiedLiterals )
+
     val allowedClausesIndex: ( List[( Set[FOLFormula], List[Int], List[( Int, List[Int] )] )] ) = allowedClausesWithIndex(
       unifiedLiterals,
       DNTAList,
@@ -266,14 +308,26 @@ object introducePi2Cut {
       nameOfExistentialVariable
     )
 
+    // println( "allowedClausesIndex" )
+    // println( allowedClausesIndex )
+    // println( "seHs.noSolutionHasBeenFound" )
+    // println( seHs.noSolutionHasBeenFound )
+
     if ( seHs.noSolutionHasBeenFound ) {
       for ( subsetSize <- 1 to allowedClausesIndex.length; if ( seHs.noSolutionHasBeenFound ) ) {
         for ( subset <- allowedClausesIndex.toSet.subsets( subsetSize ); if ( seHs.noSolutionHasBeenFound ) ) {
           if ( checkCombinedClauses( DNTAList.length, subset.toList ) ) {
             seHs.noSolutionHasBeenFound = false
             val ( clauses, _, _ ) = subset.toList.unzip3
-            // (z /: List(a, b, c)) (op)    equals   op(op(op(z, a), b), c)
-            seHs.balancedSolution = Option( ( Bottom() /: clauses.map( clause => ( Top() /: clause )( Or( _, _ ).asInstanceOf ) ) )( And( _, _ ).asInstanceOf ) )
+            val clausesAsFormula = clauses.map( clause => clause.toList ).map( clause => ( clause.head /: clause.tail )( And( _, _ ) ) )
+
+            // println( "clausesAsFormula" )
+            // println( clausesAsFormula )
+
+            seHs.balancedSolution = Option( ( clausesAsFormula.head /: clausesAsFormula.tail )( Or( _, _ ) ) )
+
+            // println( "seHs.balancedSolution" )
+            // println( seHs.balancedSolution )
           }
         }
       }
@@ -339,12 +393,19 @@ object introducePi2Cut {
           val subs: Substitution = Substitution( ( x, seHs.substitutionsForAlpha( forallIndex ) ), ( y, seHs.existentialEigenvariables( forallIndex ) ) )
           var subsetSequent: Sequent[FOLFormula] = Sequent()
           for ( ele <- subset ) {
-            subsetSequent = subsetSequent :+ subs( ele ).asInstanceOf[FOLFormula]
+            subsetSequent = Neg( subs( ele ).asInstanceOf[FOLFormula] ) +: subsetSequent
           }
 
           if ( !leaf.intersect( subsetSequent ).isEmpty ) {
             betaIndexSet = betaIndexSet :+ forallIndex
           }
+
+          // println( "leaf.intersect( subsetSequent )" )
+          // println( leaf.intersect( subsetSequent ) )
+          // println( "subs" )
+          // println( subs )
+          // println( "subsetSequent" )
+          // println( subsetSequent )
         }
         if ( betaIndexSet.nonEmpty ) {
           val newElement: ( Int, List[Int] ) = ( nonTautologicalLeaves.indexOf( leaf ), betaIndexSet )
